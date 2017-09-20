@@ -4,6 +4,9 @@ var bittrex = require('node.bittrex.api');
 bittrex.options({
     'apikey': process.env.APIKEY,
     'apisecret': process.env.APISECRET,
+    stream: false,
+    verbose: false,
+    cleartext: false,
 });
 
 //Mercados que já comprei algo com o bitcoin
@@ -190,5 +193,7 @@ function sellCalback(data, err) {
             delete allocatedMarket[order.Exchange];
             BTCbalance = BTCbalance + order.Price;
         }, 2000);
+    } else {
+        console.log("erro na venda " + err)
     }
 }

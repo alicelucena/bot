@@ -72,7 +72,7 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
     var percentual = 0.05;
     var market = listaMercado[indice];
 
-    if (!allocatedMarket.hasOwnProperty(market)) {
+    if (!allocatedMarket.hasOwnProperty(market.MarketName)) {
         bittrex.getorderbook({ market: market.MarketName, depth: 100, type: 'both' }, function(data, err) {
             market.buy = data.result.buy;
             market.sell = data.result.sell;
@@ -194,6 +194,6 @@ function sellCalback(data, err) {
             BTCbalance = BTCbalance + order.Price;
         }, 2000);
     } else {
-        console.log("erro na venda " + err)
+        console.log("erro na venda " + err);
     }
 }

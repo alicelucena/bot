@@ -2,8 +2,8 @@ var bittrex = require('node.bittrex.api');
 
 // Variáveis da conta
 bittrex.options({
-    'apikey': "184ff2dbd1b84b12b272f384eb677856",
-    'apisecret': "e0148461330e4d019688d0ea6e919b54",
+    'apikey': process.env.APIKEY,
+    'apisecret': process.env.APISECRET,
 });
 
 //Mercados que já comprei algo com o bitcoin

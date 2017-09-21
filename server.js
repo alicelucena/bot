@@ -87,57 +87,74 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
             market.buy = data.result.buy;
             market.sell = data.result.sell;
 
-            var valorCompra = market.buy[0].Rate;
-            var valorVenda = market.sell[0].Rate;
-            var valorMedio = (valorCompra + valorVenda) / 2;
+            if (market.buy[0] && market.sell[0]) {
+                var valorCompra = market.buy[0].Rate;
+                var valorVenda = market.sell[0].Rate;
+                var valorMedio = (valorCompra + valorVenda) / 2;
 
-            var valorObjetivo = valorMedio * (1 - percentual);
-            var totalMoedaCompra = 0;
-            var qtdOrdemCompra = market.buy.length;
+                var valorObjetivo = valorMedio * (1 - percentual);
+                var totalMoedaCompra = 0;
+                var qtdOrdemCompra = market.buy.length;
 
-            for (var i = 0; i < qtdOrdemCompra; i++) {
-                if (market.buy[i].Rate > valorObjetivo) {
-                    totalMoedaCompra = totalMoedaCompra + market.buy[i].Quantity;
+                for (var i = 0; i < qtdOrdemCompra; i++) {
+                    if (market.buy[i].Rate > valorObjetivo) {
+                        totalMoedaCompra = totalMoedaCompra + market.buy[i].Quantity;
+                    }
+                    else {
+                        break;
+                    }
+                }
+
+                var valorObjetivoVenda = valorMedio * (1 + percentual);
+                var totalMoedaVenda = 0;
+
+                var qtdOrdemVenda = market.sell.length;
+                for (var i = 0; i < qtdOrdemVenda; i++) {
+                    if (market.sell[i].Rate < valorObjetivoVenda) {
+                        totalMoedaVenda = totalMoedaVenda + market.sell[i].Quantity;
+                    }
+                    else {
+                        break;
+                    }
+                }
+
+                var proporcao = totalMoedaCompra / totalMoedaVenda;
+                market.proporcao = proporcao;
+
+                if (proporcao > 3 && (!melhorMarket || proporcao > melhorMarket.proporcao)) {
+                    melhorMarket = market;
+                    console.log("Melhor market do momento " + melhorMarket.MarketName + " Proporcao " + proporcao);
+                }
+
+                if (indice == listaMercado.length - 1) {
+                    if (melhorMarket) {
+                        // como saber se o market esta em manutençao?
+                        console.log("MELHOR MARKET ENCONTRADO " + melhorMarket.MarketName + " PROPORCAO " + melhorMarket.proporcao);
+                        callback(melhorMarket);
+                    }
+                    else {
+                        console.log("Não existem markets bons no mmomento. Favor aguardar.");
+                        setTimeout(() => findMarket(callback), 100);
+                    }
+
                 }
                 else {
-                    break;
+                    setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 50);
                 }
-            }
-
-            var valorObjetivoVenda = valorMedio * (1 + percentual);
-            var totalMoedaVenda = 0;
-
-            var qtdOrdemVenda = market.sell.length;
-            for (var i = 0; i < qtdOrdemVenda; i++) {
-                if (market.sell[i].Rate < valorObjetivoVenda) {
-                    totalMoedaVenda = totalMoedaVenda + market.sell[i].Quantity;
-                }
-                else {
-                    break;
-                }
-            }
-
-            var proporcao = totalMoedaCompra / totalMoedaVenda;
-            market.proporcao = proporcao;
-
-            if (!melhorMarket || proporcao > melhorMarket.proporcao) {
-                melhorMarket = market;
-                console.log("Melhor market do momento " + melhorMarket.MarketName);
-            }
-
-            if (indice == listaMercado.length - 1) {
-                console.log("MELHOR MARKET ENCONTRADO " + melhorMarket.MarketName);
-                callback(melhorMarket);
             }
             else {
+                console.log("market fora do ar " + market.MarketName);
                 setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 50);
+
             }
         });
+
     }
     else {
         console.log("Mercado já alocado");
         setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 50);
     }
+
 }
 
 
@@ -145,12 +162,12 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
 function useMarket(market) {
     allocatedMarket[market.MarketName] = true;
     console.log("Usando o market para compra " + market.MarketName);
-    var balanceToUse = Math.min(BTCbalance, 0.0005);
+    var balanceToUse = Math.min(BTCbalance, 0.001);
     BTCbalance = BTCbalance - balanceToUse;
     var price = market.Ask;
     var qtd = Math.floor((balanceToUse / price) * 100000000) / 100000000;
-
-    console.log("balance " + balanceToUse + " price" + price + "qtd " + qtd);
+    var sellPrice = price * 1.03;
+    console.log("balance " + balanceToUse + " price de compra " + price + " provavel price de venda " + sellPrice);
 
     setTimeout(() => {
         bittrex.buylimit({ market: market.MarketName, quantity: qtd, rate: price }, function(data, err) {
@@ -196,8 +213,9 @@ function vender(order) {
     var quant = order.Quantity - order.QuantityRemaining;
 
     if (quant > 0) {
-        console.log("Colocando ordem de venda " + order.Exchange);
-        var sellPrice = order.PricePerUnit * 1.02;
+        var sellPrice = order.PricePerUnit * 1.03;
+        console.log("Colocando ordem de venda " + order.Exchange + " price: " + sellPrice);
+
         setTimeout(() => {
             bittrex.selllimit({ market: order.Exchange, quantity: quant, rate: sellPrice }, function(data, err) {
                 if (!err) {

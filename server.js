@@ -11,7 +11,6 @@ bittrex.options({
 
 //Mercados que já comprei algo com o bitcoin
 var allocatedMarket = {};
-var lowerPrice = {};
 
 //Dinheiro restante em bitcoin
 var BTCbalance = 0;
@@ -22,32 +21,16 @@ function start() {
 
     // Veja quanto de dinheiro eu tenho para começarmos a procurar mercado.
     bittrex.getbalance({ currency: 'BTC' }, function(data, err) {
-        if (data.success) {
+        if (!err) {
             BTCbalance = data.result.Available;
+            console.log("SEU SALDO ATUAL É: " + BTCbalance);
+            console.log("HORA DE PROCURAR MERCADO");
             procurarMercado();
         }
         else {
-            console.log(err.message);
+            console.log("ERRO AO PEGAR O BALANCE NO START");
+            console.log(err);
             setTimeout(() => start(), 1000);
-        }
-    });
-}
-
-// Procuradno um mercado para inventir - maior volume
-function findMarket(callback) {
-
-    //tratar err depois
-    bittrex.getmarketsummaries(function(data, err) {
-
-        var BTCmarkets = data.result.filter((m) => m.MarketName.split("-")[0] == "BTC");
-
-        if (data.success) {
-            buySellCompare(BTCmarkets, callback);
-        }
-        // Erro
-        else {
-            console.log("Erro ao tentar achar o mercado com maior volume - getsummaries");
-            console.log(err.message);
         }
     });
 }
@@ -59,9 +42,29 @@ function procurarMercado() {
     }
     else {
         console.log("Quantidade de BTC muito baixa: " + BTCbalance);
-        setTimeout(() => procurarMercado(), 10000);
+        setTimeout(() => start(), 10000);
     }
 }
+
+// Procurando um mercado para inventir
+function findMarket(callback) {
+
+    bittrex.getmarketsummaries(function(data, err) {
+
+        var BTCmarkets = data.result.filter((m) => m.MarketName.split("-")[0] == "BTC");
+
+        if (!err) {
+            buySellCompare(BTCmarkets, callback);
+        }
+        // Erro
+        else {
+            console.log("Erro ao tentar pegar a lista de mercados - getsummaries");
+            console.log(err);
+            setTimeout(() => findMarket(callback), 50);
+        }
+    });
+}
+
 
 //Comparar se o mercado é bom mesmo para comprar
 function buySellCompare(listaMercado, callback, indice, melhorMarket) {
@@ -71,15 +74,22 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
     }
     var percentual = 0.05;
     var market = listaMercado[indice];
+    //    console.log("Comparando a razao entre compra e venda de " + market.MarketName);
 
     if (!allocatedMarket.hasOwnProperty(market.MarketName)) {
         bittrex.getorderbook({ market: market.MarketName, depth: 100, type: 'both' }, function(data, err) {
+
+            if (err) {
+                console.log(err);
+                setTimeout(() => buySellCompare(listaMercado, callback, indice, melhorMarket), 50);
+                return;
+            }
             market.buy = data.result.buy;
             market.sell = data.result.sell;
 
-            var valorCompra = market.buy[0].Rate;           
+            var valorCompra = market.buy[0].Rate;
             var valorVenda = market.sell[0].Rate;
-            var valorMedio = (valorCompra + valorVenda)/2
+            var valorMedio = (valorCompra + valorVenda) / 2;
 
             var valorObjetivo = valorMedio * (1 - percentual);
             var totalMoedaCompra = 0;
@@ -112,26 +122,29 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
 
             if (!melhorMarket || proporcao > melhorMarket.proporcao) {
                 melhorMarket = market;
+                console.log("Melhor market do momento " + melhorMarket.MarketName);
             }
 
             if (indice == listaMercado.length - 1) {
+                console.log("MELHOR MARKET ENCONTRADO " + melhorMarket.MarketName);
                 callback(melhorMarket);
             }
             else {
-                setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 10);
+                setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 50);
             }
         });
     }
     else {
-        setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 10);
+        console.log("Mercado já alocado");
+        setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 50);
     }
 }
 
 
 // investindo no mercado encontrado
 function useMarket(market) {
-    allocatedMarket[market.MarketName] = 1;
-    console.log("mkt " + market.MarketName);
+    allocatedMarket[market.MarketName] = true;
+    console.log("Usando o market para compra " + market.MarketName);
     var balanceToUse = Math.min(BTCbalance, 0.0005);
     BTCbalance = BTCbalance - balanceToUse;
     var price = market.Ask;
@@ -139,36 +152,41 @@ function useMarket(market) {
 
     console.log("balance " + balanceToUse + " price" + price + "qtd " + qtd);
 
-    bittrex.buylimit({ market: market.MarketName, quantity: qtd, rate: price }, buyCallback);
-    procurarMercado();
+    setTimeout(() => {
+        bittrex.buylimit({ market: market.MarketName, quantity: qtd, rate: price }, function(data, err) {
+            if (!err) {
+                var id = data.result.uuid;
+                console.log('Comprou com sucesso na ordem' + id);
+                pegaOrdem(id, vender);
+            }
+            else {
+                console.log("Erro na hora de colocar a ordem de compra.");
+                console.log(err);
+                BTCbalance = BTCbalance + balanceToUse;
+                delete allocatedMarket[market.MarketName];
+            }
+        });
+        procurarMercado();
+    }, 100);
 }
 
-// Retorno da funçao de compra
-function buyCallback(data, err) {
-    if (data.success) {
-        var id = data.result.uuid;
-        console.log('Comprou com sucesso na ordem' + id);
-        pegaOrdem(id, vender);
-    }
-    else {
-        console.log("Erro na hora de colocar a ordem de compra.");
-        console.log(err.message);
-    }
-}
 
 // Olhando se a compra ou a venda foi realizada
 function pegaOrdem(id, callback, timeout) {
-    if(!timeout) {
+    if (!timeout) {
         timeout = 100;
     }
-    
+
     bittrex.getorder({ uuid: id }, function(data, err) {
-        if (!data.result.IsOpen) {
+        if (!err && !data.result.IsOpen) {
             callback(data.result);
         }
         else {
-            console.log("Erro na hora de pegar a ordem. Aberta?" + data.result.IsOpen);
-            setTimeout(() => pegaOrdem(id, callback, timeout),timeout);
+            //            console.log("Ordem provavelmente aberta. Aberta? " + data.result.IsOpen);
+            if (err) {
+                console.log(err);
+            }
+            setTimeout(() => pegaOrdem(id, callback, timeout), timeout);
         }
     });
 }
@@ -178,22 +196,26 @@ function vender(order) {
     var quant = order.Quantity - order.QuantityRemaining;
 
     if (quant > 0) {
+        console.log("Colocando ordem de venda " + order.Exchange);
         var sellPrice = order.PricePerUnit * 1.02;
-        bittrex.selllimit({ market: order.Exchange, quantity: quant, rate: sellPrice }, sellCalback);
+        setTimeout(() => {
+            bittrex.selllimit({ market: order.Exchange, quantity: quant, rate: sellPrice }, function(data, err) {
+                if (!err) {
+                    pegaOrdem(data.result.uuid, function(order) {
+                        console.log("Vendido com sucesso " + order.Exchange);
+                        delete allocatedMarket[order.Exchange];
+                        BTCbalance = BTCbalance + order.Price;
+                    }, 2000);
+                }
+                else {
+                    console.log("Erro no callback da venda " + err);
+                    setTimeout(() => vender(order), 100);
+                }
+            });
+        }, 100);
+
     }
     else {
         console.log("Quantidade para vender é igual ou menor a zero")
-    }
-}
-
-// Uma vez que a venda foi realizada, preciso tirar do array e colocar o dinheiro de volta no BTCBalance
-function sellCalback(data, err) {
-    if (data.success) {
-        pegaOrdem(data.result.uuid, function(order) {
-            delete allocatedMarket[order.Exchange];
-            BTCbalance = BTCbalance + order.Price;
-        }, 2000);
-    } else {
-        console.log("erro na venda " + err);
     }
 }

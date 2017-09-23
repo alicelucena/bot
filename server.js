@@ -37,7 +37,7 @@ function start() {
 
 //Analisando se temos as condicoes necessarias para procurar um mercado
 function procurarMercado() {
-    if (BTCbalance > 0.0005) {
+    if (BTCbalance > 0.00050000) {
         findMarket(useMarket);
     }
     else {
@@ -87,7 +87,7 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
             market.buy = data.result.buy;
             market.sell = data.result.sell;
 
-            if (market.buy[0] && market.sell[0]) {
+            if (market.buy.length > 0 && market.sell.length >0) {
                 var valorCompra = market.buy[0].Rate;
                 var valorVenda = market.sell[0].Rate;
                 var valorMedio = (valorCompra + valorVenda) / 2;
@@ -121,14 +121,13 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
                 var proporcao = totalMoedaCompra / totalMoedaVenda;
                 market.proporcao = proporcao;
 
-                if (proporcao > 3 && (!melhorMarket || proporcao > melhorMarket.proporcao)) {
+                if (proporcao > 3 && valorCompra > 0.00001000 && (!melhorMarket || proporcao > melhorMarket.proporcao)) {
                     melhorMarket = market;
                     console.log("Melhor market do momento " + melhorMarket.MarketName + " Proporcao " + proporcao);
                 }
 
                 if (indice == listaMercado.length - 1) {
                     if (melhorMarket) {
-                        // como saber se o market esta em manutençao?
                         console.log("MELHOR MARKET ENCONTRADO " + melhorMarket.MarketName + " PROPORCAO " + melhorMarket.proporcao);
                         callback(melhorMarket);
                     }
@@ -167,7 +166,9 @@ function useMarket(market) {
     var price = market.Ask;
     var qtd = Math.floor((balanceToUse / price) * 100000000) / 100000000;
     var sellPrice = price * 1.03;
-    console.log("balance " + balanceToUse + " price de compra " + price + " provavel price de venda " + sellPrice);
+    
+    //problemas com duas casas decimais
+    console.log("balance " + balanceToUse + " price da unidade " + price + "price total " + (price * qtd)+" provavel price de venda " + sellPrice);
 
     setTimeout(() => {
         bittrex.buylimit({ market: market.MarketName, quantity: qtd, rate: price }, function(data, err) {

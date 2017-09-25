@@ -65,39 +65,48 @@ function findMarket(callback) {
     });
 }
 
-
 //Comparar se o mercado é bom mesmo para comprar
 function buySellCompare(listaMercado, callback, indice, melhorMarket) {
 
     if (!indice) {
         indice = 0;
     }
+
+    //abertura que vamos olhar de preço
     var percentual = 0.05;
     var market = listaMercado[indice];
-    //    console.log("Comparando a razao entre compra e venda de " + market.MarketName);
 
     if (!allocatedMarket.hasOwnProperty(market.MarketName)) {
         bittrex.getorderbook({ market: market.MarketName, depth: 100, type: 'both' }, function(data, err) {
 
             if (err) {
+                console.log("Erro no getorderbook dentro do buysellcompare");
                 console.log(err);
                 setTimeout(() => buySellCompare(listaMercado, callback, indice, melhorMarket), 50);
                 return;
             }
+
             market.buy = data.result.buy;
             market.sell = data.result.sell;
 
-            if (market.buy.length > 0 && market.sell.length >0) {
+            if (market.buy.length > 0 && market.sell.length > 0) {
                 var valorCompra = market.buy[0].Rate;
                 var valorVenda = market.sell[0].Rate;
                 var valorMedio = (valorCompra + valorVenda) / 2;
 
-                var valorObjetivo = valorMedio * (1 - percentual);
+                if (valorCompra < 0.00001000) {
+             //       console.log("Valor de compra da moeda é muito baixo!");
+                    setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 50);
+                    return;
+                }
+
+
+                var valorObjetivoCompra = valorMedio * (1 - percentual);
                 var totalMoedaCompra = 0;
                 var qtdOrdemCompra = market.buy.length;
 
                 for (var i = 0; i < qtdOrdemCompra; i++) {
-                    if (market.buy[i].Rate > valorObjetivo) {
+                    if (market.buy[i].Rate > valorObjetivoCompra) {
                         totalMoedaCompra = totalMoedaCompra + market.buy[i].Quantity;
                     }
                     else {
@@ -107,8 +116,8 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
 
                 var valorObjetivoVenda = valorMedio * (1 + percentual);
                 var totalMoedaVenda = 0;
-
                 var qtdOrdemVenda = market.sell.length;
+
                 for (var i = 0; i < qtdOrdemVenda; i++) {
                     if (market.sell[i].Rate < valorObjetivoVenda) {
                         totalMoedaVenda = totalMoedaVenda + market.sell[i].Quantity;
@@ -146,6 +155,7 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
                 setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 50);
 
             }
+
         });
 
     }
@@ -156,19 +166,20 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
 
 }
 
-
 // investindo no mercado encontrado
 function useMarket(market) {
     allocatedMarket[market.MarketName] = true;
     console.log("Usando o market para compra " + market.MarketName);
+
     var balanceToUse = Math.min(BTCbalance, 0.001);
     BTCbalance = BTCbalance - balanceToUse;
     var price = market.Ask;
+
     var qtd = Math.floor((balanceToUse / price) * 100000000) / 100000000;
-    var sellPrice = price * 1.03;
-    
-    //problemas com duas casas decimais
-    console.log("balance " + balanceToUse + " price da unidade " + price + "price total " + (price * qtd)+" provavel price de venda " + sellPrice);
+
+    var provavelSellPrice = (price * 1.0025) * 1.04;
+
+    console.log("balance " + balanceToUse + " price da unidade " + price + "price total " + (price * qtd) + " Provavel price de venda " + provavelSellPrice);
 
     setTimeout(() => {
         bittrex.buylimit({ market: market.MarketName, quantity: qtd, rate: price }, function(data, err) {
@@ -182,6 +193,7 @@ function useMarket(market) {
                 console.log(err);
                 BTCbalance = BTCbalance + balanceToUse;
                 delete allocatedMarket[market.MarketName];
+                //se o erro apresentar que não tenho saldo, eu nao quero que procurar mercado seja feito, quero ir para o start. posso dar break?
             }
         });
         procurarMercado();
@@ -209,12 +221,12 @@ function pegaOrdem(id, callback, timeout) {
     });
 }
 
-// Vendendo a moeda
+// Vendendo a moeda 4% lucro
 function vender(order) {
     var quant = order.Quantity - order.QuantityRemaining;
 
     if (quant > 0) {
-        var sellPrice = order.PricePerUnit * 1.03;
+        var sellPrice = (order.PricePerUnit * 1.0025) * 1.04;
         console.log("Colocando ordem de venda " + order.Exchange + " price: " + sellPrice);
 
         setTimeout(() => {

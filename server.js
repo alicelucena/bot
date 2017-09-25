@@ -95,7 +95,7 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
                 var valorMedio = (valorCompra + valorVenda) / 2;
 
                 if (valorCompra < 0.00001000) {
-             //       console.log("Valor de compra da moeda é muito baixo!");
+                    //       console.log("Valor de compra da moeda é muito baixo!");
                     setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 50);
                     return;
                 }
@@ -130,7 +130,7 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
                 var proporcao = totalMoedaCompra / totalMoedaVenda;
                 market.proporcao = proporcao;
 
-                if (proporcao > 3 && valorCompra > 0.00001000 && (!melhorMarket || proporcao > melhorMarket.proporcao)) {
+                if (proporcao > 3 && (!melhorMarket || proporcao > melhorMarket.proporcao)) {
                     melhorMarket = market;
                     console.log("Melhor market do momento " + melhorMarket.MarketName + " Proporcao " + proporcao);
                 }
@@ -171,13 +171,13 @@ function useMarket(market) {
     allocatedMarket[market.MarketName] = true;
     console.log("Usando o market para compra " + market.MarketName);
 
-    var balanceToUse = Math.min(BTCbalance, 0.001);
+    var balanceToUse = Math.min(BTCbalance * 0.9975, 0.001);
     BTCbalance = BTCbalance - balanceToUse;
     var price = market.Ask;
 
     var qtd = Math.floor((balanceToUse / price) * 100000000) / 100000000;
 
-    var provavelSellPrice = (price * 1.0025) * 1.04;
+    var provavelSellPrice = (price * 1.0025) * 1.03;
 
     console.log("balance " + balanceToUse + " price da unidade " + price + "price total " + (price * qtd) + " Provavel price de venda " + provavelSellPrice);
 
@@ -187,16 +187,18 @@ function useMarket(market) {
                 var id = data.result.uuid;
                 console.log('Comprou com sucesso na ordem' + id);
                 pegaOrdem(id, vender);
+                procurarMercado();  
             }
             else {
                 console.log("Erro na hora de colocar a ordem de compra.");
                 console.log(err);
                 BTCbalance = BTCbalance + balanceToUse;
                 delete allocatedMarket[market.MarketName];
-                //se o erro apresentar que não tenho saldo, eu nao quero que procurar mercado seja feito, quero ir para o start. posso dar break?
+                if (err.message == "INSUFFICIENT_FUNDS") {
+                    setTimeout(() => start(), 1000);
+                }
             }
         });
-        procurarMercado();
     }, 100);
 }
 
@@ -221,12 +223,12 @@ function pegaOrdem(id, callback, timeout) {
     });
 }
 
-// Vendendo a moeda 4% lucro
+// Vendendo a moeda 3% lucro
 function vender(order) {
     var quant = order.Quantity - order.QuantityRemaining;
 
     if (quant > 0) {
-        var sellPrice = (order.PricePerUnit * 1.0025) * 1.04;
+        var sellPrice = (order.PricePerUnit * 1.0025) * 1.03;
         console.log("Colocando ordem de venda " + order.Exchange + " price: " + sellPrice);
 
         setTimeout(() => {

@@ -82,6 +82,7 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
             console.log("Não existem markets bons no mmomento. Favor aguardar.");
             setTimeout(() => findMarket(callback), 100);
         }
+        return;
     }
 
     //abertura que vamos olhar de preço

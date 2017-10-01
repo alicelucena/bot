@@ -89,7 +89,7 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
             market.buy = data.result.buy;
             market.sell = data.result.sell;
 
-            if (market.buy.length > 0 && market.sell.length > 0) {
+            if (market.buy && market.sell && market.buy.length > 0 && market.sell.length > 0) {
                 var valorCompra = market.buy[0].Rate;
                 var valorVenda = market.sell[0].Rate;
                 var valorMedio = (valorCompra + valorVenda) / 2;

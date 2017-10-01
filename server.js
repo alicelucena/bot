@@ -72,6 +72,18 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
         indice = 0;
     }
 
+    // Passou do indice
+    if (indice == listaMercado.length) {
+        if (melhorMarket) {
+            console.log("MELHOR MARKET ENCONTRADO " + melhorMarket.MarketName + " PROPORCAO " + melhorMarket.proporcao);
+            callback(melhorMarket);
+        }
+        else {
+            console.log("Não existem markets bons no mmomento. Favor aguardar.");
+            setTimeout(() => findMarket(callback), 100);
+        }
+    }
+
     //abertura que vamos olhar de preço
     var percentual = 0.05;
     var market = listaMercado[indice];
@@ -134,26 +146,13 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
                     melhorMarket = market;
                     console.log("Melhor market do momento " + melhorMarket.MarketName + " Proporcao " + proporcao);
                 }
-
-                if (indice == listaMercado.length - 1) {
-                    if (melhorMarket) {
-                        console.log("MELHOR MARKET ENCONTRADO " + melhorMarket.MarketName + " PROPORCAO " + melhorMarket.proporcao);
-                        callback(melhorMarket);
-                    }
-                    else {
-                        console.log("Não existem markets bons no mmomento. Favor aguardar.");
-                        setTimeout(() => findMarket(callback), 100);
-                    }
-
-                }
-                else {
-                    setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 50);
-                }
+                
+                
+                setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 50);
             }
             else {
                 console.log("market fora do ar " + market.MarketName);
                 setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 50);
-
             }
 
         });

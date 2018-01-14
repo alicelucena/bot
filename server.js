@@ -9,6 +9,8 @@ bittrex.options({
     cleartext: false,
 });
 
+var percentual = process.env.PERCENTUAL || 0.015;
+
 //Mercados que já comprei algo com o bitcoin
 var allocatedMarket = {};
 
@@ -86,7 +88,6 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
     }
 
     //abertura que vamos olhar de preço
-    var percentual = 0.05;
     var market = listaMercado[indice];
 
     if (!allocatedMarket.hasOwnProperty(market.MarketName)) {
@@ -223,12 +224,12 @@ function pegaOrdem(id, callback, timeout) {
     });
 }
 
-// Vendendo a moeda 3% lucro
+// Vendendo a moeda
 function vender(order) {
     var quant = order.Quantity - order.QuantityRemaining;
 
     if (quant > 0) {
-        var sellPrice = (order.PricePerUnit * 1.0025) * 1.03;
+        var sellPrice = order.PricePerUnit * (1+percentual);
         console.log("Colocando ordem de venda " + order.Exchange + " price: " + sellPrice);
 
         setTimeout(() => {

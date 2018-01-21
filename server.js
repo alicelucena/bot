@@ -9,7 +9,7 @@ bittrex.options({
     cleartext: false,
 });
 
-var percentual = process.env.PERCENTUAL || 0.015;
+var percentual = process.env.PERCENTUAL || 0.010;
 
 //Mercados que já comprei algo com o bitcoin
 var allocatedMarket = {};
@@ -39,7 +39,7 @@ function start() {
 
 //Analisando se temos as condicoes necessarias para procurar um mercado
 function procurarMercado() {
-    if (BTCbalance > 0.00050000) {
+    if (BTCbalance > 0.000) {
         findMarket(useMarket);
     }
     else {
@@ -75,23 +75,24 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
     }
 
     // Passou do indice
-    if (indice == listaMercado.length) {
+//   if (indice == listaMercado.length) {
         if (melhorMarket) {
             console.log("MELHOR MARKET ENCONTRADO " + melhorMarket.MarketName + " PROPORCAO " + melhorMarket.proporcao);
             callback(melhorMarket);
+            return;
         }
-        else {
-            console.log("Não existem markets bons no mmomento. Favor aguardar.");
-            setTimeout(() => findMarket(callback), 100);
-        }
-        return;
-    }
+    //    else {
+      //      console.log("Não existem markets bons no mmomento. Favor aguardar.");
+    //        setTimeout(() => findMarket(callback), 100);
+     //   }
+  //      
+//    }
 
     //abertura que vamos olhar de preço
     var market = listaMercado[indice];
 
     if (!allocatedMarket.hasOwnProperty(market.MarketName)) {
-        bittrex.getorderbook({ market: market.MarketName, depth: 100, type: 'both' }, function(data, err) {
+        bittrex.getorderbook({ market: market.MarketName, depth: 50, type: 'both' }, function(data, err) {
 
             if (err) {
                 console.log("Erro no getorderbook dentro do buysellcompare");
@@ -106,9 +107,11 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
             if (market.buy && market.sell && market.buy.length > 0 && market.sell.length > 0) {
                 var valorCompra = market.buy[0].Rate;
                 var valorVenda = market.sell[0].Rate;
+
+
                 var valorMedio = (valorCompra + valorVenda) / 2;
 
-                if (valorCompra < 0.00001000) {
+                if (valorCompra < 0.00005000) {
                     //       console.log("Valor de compra da moeda é muito baixo!");
                     setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 50);
                     return;
@@ -144,7 +147,10 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
                 var proporcao = totalMoedaCompra / totalMoedaVenda;
                 market.proporcao = proporcao;
 
-                if (proporcao > 3 && (!melhorMarket || proporcao > melhorMarket.proporcao)) {
+                var valorVenda10 = market.sell[1].Rate;
+                var provavelSellPrice = valorCompra * (1+percentual);
+
+                if (proporcao > 3 && (!melhorMarket || proporcao > melhorMarket.proporcao) && provavelSellPrice < valorVenda10) {
                     melhorMarket = market;
                     console.log("Melhor market do momento " + melhorMarket.MarketName + " Proporcao " + proporcao);
                 }
@@ -164,7 +170,6 @@ function buySellCompare(listaMercado, callback, indice, melhorMarket) {
         console.log("Mercado já alocado");
         setTimeout(() => buySellCompare(listaMercado, callback, indice + 1, melhorMarket), 50);
     }
-
 }
 
 // investindo no mercado encontrado
@@ -172,13 +177,13 @@ function useMarket(market) {
     allocatedMarket[market.MarketName] = true;
     console.log("Usando o market para compra " + market.MarketName);
 
-    var balanceToUse = Math.min(BTCbalance * 0.9975, 0.001);
+    var balanceToUse =0.005;
     BTCbalance = BTCbalance - balanceToUse;
     var price = market.Ask;
 
     var qtd = Math.floor((balanceToUse / price) * 100000000) / 100000000;
 
-    var provavelSellPrice = (price * 1.0025) * 1.03;
+    var provavelSellPrice = price * (1+percentual);
 
     console.log("balance " + balanceToUse + " price da unidade " + price + "price total " + (price * qtd) + " Provavel price de venda " + provavelSellPrice);
 

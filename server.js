@@ -39,7 +39,7 @@ function start() {
 
 //Analisando se temos as condicoes necessarias para procurar um mercado
 function procurarMercado() {
-    if (BTCbalance > 0.000) {
+    if (BTCbalance > 0.005) {
         findMarket(useMarket);
     }
     else {

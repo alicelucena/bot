@@ -177,7 +177,7 @@ function useMarket(market) {
     allocatedMarket[market.MarketName] = true;
     console.log("Usando o market para compra " + market.MarketName);
 
-    var balanceToUse =0.005;
+    var balanceToUse =0.002;
     BTCbalance = BTCbalance - balanceToUse;
     var price = market.Ask;
 
